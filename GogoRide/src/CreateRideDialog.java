@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 public class CreateRideDialog extends JDialog {
+    private static final long serialVersionUID = 1L;
     private JTextField driverNameField;
     private JTextField originField;
     private JTextField destinationField;
