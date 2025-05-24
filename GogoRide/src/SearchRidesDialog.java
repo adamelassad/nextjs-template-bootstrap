@@ -1,95 +1,138 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.Vector;
 
 public class SearchRidesDialog extends JDialog {
+    private static final long serialVersionUID = 1L;
+    private RideManager rideManager;
     private JTextField originField;
     private JTextField destinationField;
-    private JTable resultsTable;
+    private JTable ridesTable;
     private DefaultTableModel tableModel;
+    private SimpleDateFormat dateFormat;
+    private JPanel mainPanel;
 
     public SearchRidesDialog(Frame parent, RideManager rideManager) {
         super(parent, "Search Rides", true);
+        this.rideManager = rideManager;
+        this.dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        initializeComponents();
+        loadInitialRides();
+    }
 
-        JPanel panel = new JPanel(new BorderLayout());
+    private void initializeComponents() {
+        mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JPanel inputPanel = new JPanel(new GridBagLayout());
-        GridBagConstraints cs = new GridBagConstraints();
-        cs.fill = GridBagConstraints.HORIZONTAL;
+        // Search Panel
+        JPanel searchPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
 
-        JLabel lbOrigin = new JLabel("Origin: ");
-        cs.gridx = 0;
-        cs.gridy = 0;
-        cs.gridwidth = 1;
-        inputPanel.add(lbOrigin, cs);
+        // Origin field
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        searchPanel.add(new JLabel("Origin:"), gbc);
 
+        gbc.gridx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
         originField = new JTextField(20);
-        cs.gridx = 1;
-        cs.gridy = 0;
-        cs.gridwidth = 2;
-        inputPanel.add(originField, cs);
+        searchPanel.add(originField, gbc);
 
-        JLabel lbDestination = new JLabel("Destination: ");
-        cs.gridx = 0;
-        cs.gridy = 1;
-        cs.gridwidth = 1;
-        inputPanel.add(lbDestination, cs);
+        // Destination field
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.weightx = 0;
+        searchPanel.add(new JLabel("Destination:"), gbc);
 
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
         destinationField = new JTextField(20);
-        cs.gridx = 1;
-        cs.gridy = 1;
-        cs.gridwidth = 2;
-        inputPanel.add(destinationField, cs);
+        searchPanel.add(destinationField, gbc);
 
+        // Search button
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.CENTER;
         JButton btnSearch = new JButton("Search");
-        cs.gridx = 1;
-        cs.gridy = 2;
-        cs.gridwidth = 1;
-        inputPanel.add(btnSearch, cs);
+        btnSearch.addActionListener(e -> performSearch());
+        searchPanel.add(btnSearch, gbc);
 
-        panel.add(inputPanel, BorderLayout.NORTH);
+        mainPanel.add(searchPanel, BorderLayout.NORTH);
 
-        // Table for results
-        String[] columnNames = {"Driver", "Origin", "Destination", "Date", "Available Seats"};
-        tableModel = new DefaultTableModel(columnNames, 0);
-        resultsTable = new JTable(tableModel);
-        JScrollPane scrollPane = new JScrollPane(resultsTable);
-        panel.add(scrollPane, BorderLayout.CENTER);
+        // Results table
+        initializeTable();
+        JScrollPane scrollPane = new JScrollPane(ridesTable);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        btnSearch.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                String origin = originField.getText().trim();
-                String destination = destinationField.getText().trim();
-                if (origin.isEmpty() || destination.isEmpty()) {
-                    JOptionPane.showMessageDialog(SearchRidesDialog.this,
-                            "Please enter both origin and destination.",
-                            "Search Rides",
-                            JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-                List<Ride> results = rideManager.searchRides(origin, destination);
-                updateTable(results);
-            }
-        });
+        // Button panel
+        JPanel buttonPanel = new JPanel();
+        JButton btnClose = new JButton("Close");
+        btnClose.addActionListener(e -> dispose());
+        buttonPanel.add(btnClose);
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
-        getContentPane().add(panel);
+        // Add to dialog
+        getContentPane().add(mainPanel);
         setSize(600, 400);
-        setLocationRelativeTo(parent);
+        setLocationRelativeTo(null);
+    }
+
+    private void initializeTable() {
+        String[] columnNames = {"Driver", "From", "To", "Date", "Available Seats"};
+        tableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        ridesTable = new JTable(tableModel);
+        ridesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+    }
+
+    private void loadInitialRides() {
+        updateTable(rideManager.getRides());
+    }
+
+    private void performSearch() {
+        String origin = originField.getText().trim();
+        String destination = destinationField.getText().trim();
+        
+        List<Ride> results;
+        if (origin.isEmpty() && destination.isEmpty()) {
+            // If no search criteria, show all rides
+            results = rideManager.getRides();
+        } else {
+            // Otherwise, search with the provided criteria
+            results = rideManager.searchRides(origin, destination);
+            
+            if (results.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "No rides found for this route.",
+                        "Search Results",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
+        }
+        
+        updateTable(results);
     }
 
     private void updateTable(List<Ride> rides) {
         tableModel.setRowCount(0);
         for (Ride ride : rides) {
-            Object[] row = {
-                    ride.getDriverName(),
-                    ride.getOrigin(),
-                    ride.getDestination(),
-                    ride.getDate(),
-                    ride.getAvailableSeats()
-            };
+            Vector<Object> row = new Vector<>();
+            row.add(ride.getDriverName());
+            row.add(ride.getOrigin());
+            row.add(ride.getDestination());
+            row.add(dateFormat.format(ride.getDate()));
+            row.add(ride.getAvailableSeats());
             tableModel.addRow(row);
         }
     }
